@@ -38,14 +38,16 @@ export const deleteRequest = (request, token) => {
 };
 
 
-export const changeStateRequest = (request , state, token) => {
+export const changeStateRequest = (request , state, token, reason) => {
   return fetch(`${API}/requests/update/state/${request._id}/${state}`, {
     method: "PUT",
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
-    }
+    },
+	
+	body: JSON.stringify({'comment': reason}),
   })
     .then((responce) => {
       return responce.json();
@@ -55,8 +57,8 @@ export const changeStateRequest = (request , state, token) => {
     });
 };
 
-export const getRequests = (userId , role, token, type, state, currentPage) => {
-  return fetch(`${API}/requests/${userId}/${role}/${type}/${state}?page=${currentPage}`, {
+export const getRequests = (userId , role, token, type, state, currentPage, filterByUserId) => {
+  return fetch(`${API}/requests/${userId}/${role}/${type}/${state}?page=${currentPage}&user=${filterByUserId}`, {
     method: "GET",
     headers: {
       Accept: "application/json",

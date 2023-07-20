@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 
-const {signup, signin, signout, requireSignin , getAllUsers  , getUserById , getAllManagerUsers, updateUser, forgotPasswordCheckEmail, forgotPasswordCheckOTP, changePassword} = require("../controllers/user")
+const {signup, signin, signout, requireSignin , getAllUsers  , getUserById , getAllManagerUsers, updateUser, forgotPasswordCheckEmail, forgotPasswordCheckOTP, changePassword, getAllUsersByRole} = require("../controllers/user")
 
 const {userSignupValidator} = require("../validator")
 
@@ -16,5 +16,6 @@ router.post("/:userId/update", requireSignin, updateUser);
 router.post("/check-email", forgotPasswordCheckEmail);
 router.post("/check-otp", forgotPasswordCheckOTP);
 router.post("/change-password", changePassword);
+router.get("/users-list/:userId",  requireSignin , getAllUsersByRole);
 
 module.exports = router;

@@ -431,7 +431,7 @@ const NewUser = ({setIsLoading}) => {
 			{errors.role.length > 0 && <span className='spn-error'>{errors.role}</span>}
 			<Form.Group as={Row} className="mb-1">
 				<Col sm="12">
-				  <Button variant="primary" onClick={handleShowManager} disabled={role != 1}>
+				  <Button variant="primary" onClick={handleShowManager} disabled={(role != 1 && role != 2)}>
 					Select the manager
 				  </Button>
 				</Col>

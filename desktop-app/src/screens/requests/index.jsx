@@ -5,9 +5,16 @@ import Col from "react-bootstrap/Col";
 import Row from "react-bootstrap/Row";
 import Card from "react-bootstrap/Card";
 import { deleteRequest, getRequests  , changeStateRequest } from "../../api/request";
+import { getUsersForFilter } from "../../api/user";
 import moment from "moment";
 import { isAuthenticated } from "../../auth";
 import { Button } from "react-bootstrap";
+import Form from "react-bootstrap/Form";
+import Modal from '../../utils/Model';
+import ModalTitle from '../../utils/ModalTitle';
+import ModalHeader from "../../utils/ModalHeader"
+import ModalBody from '../../utils/ModalBody';
+import ModalFooter from '../../utils/ModalFooter';
 import Pagination from '../../utils/Pagination/Pagination';
 
 const Requests = ({setIsLoading}) => {
@@ -23,15 +30,60 @@ const Requests = ({setIsLoading}) => {
   const [currentPage, setCurrentPage] = useState(1);  
   const [totalCount, setTotalCount] = useState(0);
   const [perPage, setPerPage] = useState(0);
+  
+  const [usersForFilter, setUsersForFilter] = React.useState([]);
+  const [user_filter, setUserFilter] = React.useState('');
+  
+  const [showReasonModal, setShowReasonModal] = React.useState(false);
+  
+  const [request, setRequest] = React.useState({});
+  const [changedState, setChangedState] = React.useState('');
+  
+  const [values, setValues] = React.useState({
+	  reason: '',
+	  errors: {
+        reason: '',
+      }
+  });
+  
+  const {reason, errors}= values;
+  
+  const handleChange = (name) => (event) => {
+	const value = event.target?.value;
+	errors.reason = '';
+    if(name == 'reason'){
+		if(value == '' || value.length < 5){
+			errors.reason = 'Reason must be atleast 5 characters long.'
+		}
+	}
+	
+	setValues({ ...values, errors: errors, [name]: value });
+  };
+  
+  const filterRequestsByUser = (event) => {setUserFilter(event.target?.value);}
 
   useEffect(() => {
 	getRequestsData();
-  }, [reqState, currentPage]);
+  }, [reqState, currentPage, user_filter]);
+  
+  useEffect(() => {
+	setIsLoading(true);
+	getUsersForFilter(user._id, token).then((response) => {
+	  setIsLoading(false);
+	  if (response.status) {
+		  setUsersForFilter(response.data);
+	  } else {
+		console.log("🚀 ~ file: requests/index.jsx:44 ~ getRequestsData ~ data:", response)
+	  }
+	}).catch((err) => {
+	   console.log("🚀 ~ file: requests/index.jsx:47 ~ getRequestsData ~ data:", err)
+	});
+  }, []);
   
   const getRequestsData = () => {
 	if((type != 'approvals') || (type == 'approvals' && reqState != '' && reqState != undefined && reqState != 'all')){
 		setIsLoading(true);
-		getRequests(user._id , user.role, token, type, reqState, currentPage).then((response) => {
+		getRequests(user._id , user.role, token, type, reqState, currentPage, user_filter).then((response) => {
 		  setIsLoading(false);
 		  if (response.status) {
 			  setRequests(response.data.requests);
@@ -67,12 +119,38 @@ const Requests = ({setIsLoading}) => {
       }
     });
   };
-
+  
   const changeState = (request , state) => {
+	setValues({ ...values, errors: {reason: ''}, reason: '' });
+	setRequest(request)
+	setChangedState(state)
+	setShowReasonModal(true)
+	window.scrollTo(0,0);
+  }
+  
+  const handleReasonModalClose = () => setShowReasonModal(false);
+
+  const changeStateSubmit = () => {
+	
+	errors.reason = '';
+	if(reason == '' || reason.length < 5){
+		errors.reason = 'Reason must be atleast 5 characters long.';
+	}
+	
+	let valid = true;
+    Object.values(errors).forEach(val => val.length > 0 && (valid = false));
+  
+    if(!valid){
+	  setValues({ ...values, errors: errors });
+	  console.error('Invalid Form');
+	  return false;
+    }
+	  
 	setIsLoading(true);
-	changeStateRequest(request , state, token).then((response) => { 
+	changeStateRequest(request , changedState, token, reason).then((response) => { 
       setIsLoading(false);	
       if (response.status) {
+		setShowReasonModal(false)
 		setIsLoading(true);
         getRequests(user._id, user.role, token, type, reqState, currentPage).then((response) => {
 		  setIsLoading(false);
@@ -92,6 +170,7 @@ const Requests = ({setIsLoading}) => {
   
   const setApprovalsAction = (state) => {
 	setReqState(state);	
+	setCurrentPage(1);	
   }
   
   const _showDateFormat = (date) => {
@@ -113,6 +192,22 @@ const Requests = ({setIsLoading}) => {
 	  </div>
    
 	 {type === "pending"  && <>   <h1 className="text-center">Pending Leave Requests</h1>
+	 
+	 {
+		 user.role === 0 ? <>
+			 <Form.Select aria-label="Select Role" onChange={filterRequestsByUser} style={{marginBottom: 20+'px'}}>
+				  <option disabled>Select User to filter</option>
+				  <option value="">All</option>
+				  {
+					usersForFilter.map((record, index) => {
+						return <option key={record._id} value={record._id} >
+							{record.firstname} {record.lastname}
+						</option>
+					})
+				  }
+			  </Form.Select>
+		  </> : ''
+	 }
      
      <div className="requests-list">
 		<Accordion defaultActiveKey="0">
@@ -210,13 +305,29 @@ const Requests = ({setIsLoading}) => {
      {/* ----------------------------------------------------------- */}
 
      <h1 className="text-center">Completed Leave Requests</h1>
+	 
+	 {
+		 user.role === 0 ? <>
+			 <Form.Select aria-label="Select Role" onChange={filterRequestsByUser} style={{marginBottom: 20+'px'}}>
+				  <option disabled>Select User to filter</option>
+				  <option value="">All</option>
+				  {
+					usersForFilter.map((record, index) => {
+						return <option key={record._id} value={record._id} >
+							{record.firstname} {record.lastname}
+						</option>
+					})
+				  }
+			  </Form.Select>
+		  </> : ''
+	 }
      
      <div className="requests-list">
 		<Accordion defaultActiveKey="0">
 			{requests.filter(request=>request.state === "rejected"|| request.state === "approved").length > 0 ? <>{requests.filter(request=>request.state === 	"rejected"|| request.state === "approved").map((request, index) => {
 			  return (
 				<Accordion.Item eventKey={index} key={request._id}>
-				  <Accordion.Header ><span className={`${request.state === "canceled" ? "text-muted-2" : ""}`}>Request {index + 1}  <b className="m-1">({request.state})</b></span></Accordion.Header>
+				  <Accordion.Header ><span className={`${request.state === "canceled" ? "text-muted-2" : ""}`}>Request {index + 1 + (perPage*(currentPage-1))}  <b className="m-1">({request.state})</b></span></Accordion.Header>
 				  <Accordion.Body className={`${request.state === "canceled" ? "text-muted-2" : ""}`}>
 					<Row>					  
 					  {
@@ -250,6 +361,11 @@ const Requests = ({setIsLoading}) => {
 						  <b>Reason: </b>
 						  <br />
 						  {request.reason}
+					  </Col>
+					  <Col sm="12">
+						  <b>Comment: </b>
+						  <br />
+						  {request?.comment}
 					  </Col>
 
 					  <Col sm="5" className="mt-1"></Col>
@@ -296,6 +412,23 @@ const Requests = ({setIsLoading}) => {
 		<button className={`${reqState === "pending" ? "activBtn" : ""}`} style={{marginRight: 20+'px',border: "none",padding: 4+'px '+10+'px'}}  onClick={() => setApprovalsAction("pending")}>Pending Requests</button>
 		<button className={`${reqState === "approved" ? "activBtn" : ""}`} style={{border: "none",padding: 4+'px '+10+'px'}}  onClick={() => setApprovalsAction("approved")}>Approved Requests</button>
 	 </div>
+	 
+	 {
+		 (user.role === 0 || user.role === 2) ? <>
+			 <Form.Select aria-label="Select Role" onChange={filterRequestsByUser} style={{marginBottom: 20+'px'}}>
+				  <option disabled>Select User to filter</option>
+				  <option value="">All</option>
+				  {
+					usersForFilter.map((record, index) => {
+						return <option key={record._id} value={record._id} >
+							{record.firstname} {record.lastname}
+						</option>
+					})
+				  }
+			  </Form.Select>
+		  </> : ''
+	 }
+	 
 	 <div className="requests-list">        
 	 
 	 {(reqState != undefined && reqState != '' && reqState != 'all') ? <>
@@ -303,7 +436,7 @@ const Requests = ({setIsLoading}) => {
 			{requests.filter(request=>request.state === "approved" || request.state === "canceled" || request.state === "pending").length > 0 ? <> {requests.filter(request=>request.state === "approved" || request.state === "canceled" || request.state === "pending").map((request, index) => {
 			  return (
 				<Accordion.Item eventKey={index} key={request._id}>
-				  <Accordion.Header ><span className={`${request.state === "canceled" ? "text-muted-2" : ""}`}>Request {index + 1}  <b className="m-1">({request.state})</b></span></Accordion.Header>
+				  <Accordion.Header ><span className={`${request.state === "canceled" ? "text-muted-2" : ""}`}>Request {index + 1 + (perPage*(currentPage-1))}  <b className="m-1">({request.state})</b></span></Accordion.Header>
 				  <Accordion.Body className={`${request.state === "canceled" ? "text-muted-2" : ""}`}>
 					<Row>
 					  {
@@ -338,6 +471,15 @@ const Requests = ({setIsLoading}) => {
 						  <br />
 						  {request.reason}
 					  </Col>
+					  {
+						  request.state != "pending" ? (
+							  <Col sm="12">
+								  <b>Comment: </b>
+								  <br />
+								  {request?.comment}
+							  </Col>
+						  ) : ''
+					  }
 
 					  <Col sm="5" className="mt-1"></Col>
 					  {
@@ -381,6 +523,34 @@ const Requests = ({setIsLoading}) => {
 	 }
 </>}
 
+        <Modal show={showReasonModal} onHide={handleReasonModalClose}>
+		  <ModalBody>
+			  <Card className="p-1 mb-1">
+				<Form.Group className="mb-3" controlId="formBasicPassword">
+				  <Form.Label>
+					Reason/Comments <span className="text-muted">(*)</span>
+				  </Form.Label>
+				  <Form.Control
+					placeholder="Enter Reason/Comments"
+					value={reason}
+					onChange={handleChange("reason")}
+					as="textarea"
+					rows={3}
+				  />
+				  {errors.reason.length > 0 && 
+					<span className='spn-error'>{errors.reason}</span>}
+				</Form.Group>
+			  </Card>			
+		  </ModalBody>
+		  <ModalFooter>
+			<Button variant="primary" onClick={changeStateSubmit}>
+			  Submit
+			</Button>
+			<Button variant="secondary" onClick={handleReasonModalClose}>
+			  Close
+			</Button>
+		  </ModalFooter>
+	  </Modal>  
 
     </div>
   );

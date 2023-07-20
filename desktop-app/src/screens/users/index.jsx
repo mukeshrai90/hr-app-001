@@ -205,6 +205,11 @@ const Users = ({setIsLoading}) => {
       console.error(errors);
 	  return false;
     }
+	
+	if(!manager._id && role == "1"){
+      setValues({...values, error :  "Please select manager"})
+      return ;
+    }
 
     setValues({ ...values, error: false });
 	
@@ -462,7 +467,7 @@ const Users = ({setIsLoading}) => {
 				{errors.role.length > 0 && <span className='spn-error'>{errors.role}</span>}
 				<Form.Group as={Row} className="mb-1">
 					<Col sm="12">
-					  <Button variant="primary" onClick={handleModalShowManager} disabled={role != 1}>
+					  <Button variant="primary" onClick={handleModalShowManager} disabled={(role != 1 && role != 2)}>
 						Select the manager
 					  </Button>
 					</Col>
@@ -511,7 +516,7 @@ const Users = ({setIsLoading}) => {
 			  <ListGroup as="ol" numbered>
 			  {
 				  manager_users.map(user=>{
-					return user.role == 2 && (
+					return user.role == 2 && user._id != userId && (
 					  <ListGroup.Item
 					  as="li"
 					  className="d-flex justify-content-between align-items-start"

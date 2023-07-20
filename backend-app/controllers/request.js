@@ -2,13 +2,19 @@ const Request = require("../models/Request");
 const User = require("../models/user");
 const { errorHandler } = require("../helpers/dbErrorHandler");
 const { responseHandler } = require("../helpers/responseHandler");
+const { sendMail } = require("../helpers/mailer");
 
 exports.create = async (req, res) => {
   const userId = req.params.userId;
   const start_date_req = new Date(req.body.start_date).toISOString();
   const end_date_req = new Date(req.body.end_date).toISOString();
   const request = new Request({ ...req.body, userId });
-  console.log(start_date_req, end_date_req);
+  
+  let user = await User.findOne({_id: userId});
+  if(Object.keys(user).length === 0){
+	return responseHandler(res, 'error', [], 'Invalid user')
+  }
+
   let requests = await Request.find({ userId: userId, state: {$nin: ["canceled", "rejected"]}, 
 							$or: [{
 									start_date: {$gte: start_date_req, $lte: end_date_req},
@@ -30,12 +36,45 @@ exports.create = async (req, res) => {
 	  return responseHandler(res, 'error', requestIds, 'Leave Request already exist with overlapping dates.')
   }
   
-  request.save((err, request) => {
+  request.save(async (err, request) => {
     if (err) {
 	  console.log("🚀 ~ file: controllers/request.js:35 ~ deleteRequest ~ _data:", err)
       return responseHandler(res, 'db_error', [], err)
     }
-
+	
+	//send email now
+	
+	let hr_admin = await User.findOne({role: 0}).sort({_id:1});
+	
+	let manager = {};
+	if(user.managerId != ''){
+		manager  = await User.findOne({_id: user.managerId});
+	}
+	
+	let toEmails = [];
+	if(Object.keys(hr_admin).length > 0 && hr_admin._id != undefined){
+		toEmails.push(hr_admin.email);
+	}
+	if(Object.keys(manager).length > 0 && manager._id != undefined){
+		toEmails.push(manager.email);
+	}
+	
+	if(toEmails.length){
+		
+		let start_date = new Date(request.start_date).toISOString().substring(0, 10);
+		let end_date = new Date(request.end_date).toISOString().substring(0, 10);
+		
+		let mailData = {
+			subject : `New Leave Request from ${user.firstname} ${user.lastname}`,
+			html : `Leave Request Details: <br/><br/>Start date: ${start_date}<br/>End date: ${end_date}<br/>Request Type: ${request.request_type}<br/>Reason: ${request.reason}`
+		}
+		
+		for(email of toEmails){
+			mailData.to = email;
+			sendMail(mailData);
+		}
+	}
+	
 	return responseHandler(res, 'success', request)
   });
 };
@@ -47,40 +86,53 @@ exports.getAllRequestByUserId = async (req, res) => {
     var page = Math.max(0, (req.query.page-1));
 	let filterCondtn = {};
 	
-	let user = await User.findOne({_id: req.params.userId});
+	if(req.query?.user != '' && req.query?.user != 'undefined'){
+	  filterCondtn = {...filterCondtn, userId: req.query?.user};
+    }
+	
+	let requestState = req.params.state;
+	let requestType = req.params.type;
+	let userId = req.params.userId;
+	let user = await User.findOne({_id: userId});
 	
 	let states = ["pending"];
-	if(req.params.type == 'completed'){
+	if(requestType == 'completed'){
 		states = ["approved", "rejected", "canceled"];
 		if(user.role === 1){
 			states = ["approved", "rejected"];
 		}
-	} else if(req.params.type == 'approvals'){
-		states = [req.params.state];
+	} else if(requestType == 'approvals'){
+		states = [requestState];
 	}
 	
 	if(user.role === 1){
-		filterCondtn = { userId: req.params.userId, state: {$in: states} };
+		filterCondtn = {...filterCondtn, userId: userId, state: {$in: states} };
 	  
     } else if(user.role === 2){
-		if(req.params.type == 'approvals'){
+		if(requestType == 'approvals'){
+			
+			let teamFilterCondtn = {managerId: userId}
+			if(req.query?.user != '' && req.query?.user != 'undefined'){
+			   teamFilterCondtn = {...teamFilterCondtn, _id: req.query?.user};
+			}
 			
 			//get manager's teams user_ids
-			let team_users = await User.find({managerId: req.params.userId});
+			let team_users = await User.find(teamFilterCondtn);
 			let usersIds = team_users.map(function(user) {
 			  return user._id;
 			});
 			
-			filterCondtn = { state: {$in: states}, userId: {$in: usersIds} };
+			filterCondtn = {};
+			filterCondtn = {...filterCondtn, state: {$in: states}, userId: {$in: usersIds} };
 			
 		} else {
-			filterCondtn = { userId: req.params.userId, state: {$in: states} };
+			filterCondtn = {...filterCondtn, userId: userId, state: {$in: states} };
 		}
 	} else if(user.role === 0){
-		if(req.params.type == 'approvals'){
-			filterCondtn = { state: {$in: [req.params.state]} };
+		if(requestType == 'approvals'){
+			filterCondtn = {...filterCondtn, state: {$in: [requestState]} };
 		} else {
-			filterCondtn = { state: {$ne: "canceled"}, state: {$in: states} };	
+			filterCondtn = {...filterCondtn, state: {$ne: "canceled"}, state: {$in: states} };	
 		} 
     }
 	
@@ -113,16 +165,46 @@ exports.deleteRequest =  (req, res) => {
 };
 
 
-exports.updateRequestState =  (req, res) => {
-  Request.findByIdAndUpdate(req.params.id , {state : req.params.state}, function (err, docs) {
+exports.updateRequestState =  async (req, res) => {
+	
+  let request = await Request.findOne({_id: req.params.id}).populate("userId")
+  if(Object.keys(request).length === 0){
+	return responseHandler(res, 'error', [], 'Invalid request')
+  }
+  
+  let state = req.params.state;
+  let comment = req?.body?.comment;
+  
+  Request.findByIdAndUpdate(req.params.id , {state : state, comment: comment}, function (err, docs) {
     if (err){
       console.log("🚀 ~ file: controllers/request.js:116 ~ updateRequestState ~ _data:", err)
       res.status(500).json(err);
 	  return responseHandler(res, 'db_error', [], err, 500)
     }
-    else{
-	  return responseHandler(res, 'success')
-    }
+	
+	
+	if(state == 'approved' || state == 'rejected'){
+	
+		let toEmails = [request.userId.email];
+		
+		if(toEmails.length){
+			
+			let start_date = new Date(request.start_date).toISOString().substring(0, 10);
+			let end_date = new Date(request.end_date).toISOString().substring(0, 10);
+			
+			let mailData = {
+				subject : `Your leave has been ${state}`,
+				html : `Leave Request Details: <br/><br/>Start date: ${start_date}<br/>End date: ${end_date}<br/>Request Type: ${request.request_type}<br/>Reason: ${request.reason}<br><br/>Comment: ${comment}`
+			}
+			
+			for(email of toEmails){
+				mailData.to = email;
+				sendMail(mailData);
+			}
+		}
+	}
+	
+	return responseHandler(res, 'success')
 });
 
 };

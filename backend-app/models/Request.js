@@ -24,7 +24,10 @@ const RequestSchema = new mongoose.Schema({
         required : true,
         enum : ['pending', 'canceled', "rejected", "approved"],
         default :  "pending"
-    }
+    },
+	comment: {
+		type : String,
+	}
   
 
 }, {timestamps : true})

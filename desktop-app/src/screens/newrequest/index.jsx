@@ -71,7 +71,7 @@ const NewRequest = ({setIsLoading}) => {
 			break;
 		  case 'request_type': 
 			errors.request_type = 
-			  value.length < 0
+			  value.length < 1
 				? 'Request type is required!'
 				: '';
 			break;
@@ -136,7 +136,6 @@ const NewRequest = ({setIsLoading}) => {
 		setValues({
           start_date: moment().format("YYYY-MM-DD"),
           end_date: moment().format("YYYY-MM-DD"),
-          request_type: "",
           reason: "",
 
           success: true,
@@ -145,7 +144,7 @@ const NewRequest = ({setIsLoading}) => {
 			start_date: '',
 			end_date: '',
 			reason: '',
-			request_type: '',
+			request_type: "",
 		  }
         });
         
@@ -164,7 +163,6 @@ const NewRequest = ({setIsLoading}) => {
     setValues({
       start_date: moment().format("YYYY-MM-DD"),
       end_date: moment().format("YYYY-MM-DD"),
-      request_type: "",
       reason: "",
 
       success: false,

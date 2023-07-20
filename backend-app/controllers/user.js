@@ -2,6 +2,7 @@ const User = require("../models/user");
 const ForgotPassword = require("../models/ForgotPassword");
 const { errorHandler } = require("../helpers/dbErrorHandler");
 const { responseHandler } = require("../helpers/responseHandler");
+const { sendMail } = require("../helpers/mailer");
 
 const jwt = require("jsonwebtoken"); //to generate sign token
 const expressJwt = require("express-jwt"); // for authorization
@@ -167,8 +168,8 @@ exports.forgotPasswordCheckEmail = async (req, res) => {
   let users = await User.find({ email: req.body.email})
   if(users != null && users.length){
 	  let user = users[0];
-	  // const verification_code = Math.floor(100000 + Math.random() * 900000);
-	  const verification_code = 120830;
+	  const verification_code = Math.floor(100000 + Math.random() * 900000);
+	  // const verification_code = 120830;
 	  const data = new ForgotPassword({userId: user._id, verification_code: verification_code});
   
 	  data.save((err, model) => {
@@ -176,6 +177,15 @@ exports.forgotPasswordCheckEmail = async (req, res) => {
 		  console.log("🚀 ~ file: controllers/user.js:174 ~ forgotPasswordCheckEmail ~ data:", err)
 		  return responseHandler(res, 'db_error', [], err)
 		}
+		
+		//send email
+		let mailData = {
+			to : user.email,
+			subject : `OTP to change your password`,
+			html : `Your one time password is <b>${verification_code}</b>`
+		}
+		
+		sendMail(mailData);
 
 		return responseHandler(res, 'success', { token: model._id  }, 'OTP has been sent to Email.')
 	  });
@@ -246,4 +256,30 @@ exports.changePassword = async (req, res) => {
   } else {
 	  return responseHandler(res, 'error', [], 'Invalid Token!', 403)
   }
+};
+
+exports.getAllUsersByRole = async (req, res) => {
+  
+  const userId = req.params.userId;
+  let filterCondtn = {};
+  
+  let user = await User.findOne({_id: userId});
+  
+  if(user.role === 2){
+	  
+	//get manager's teams user_ids
+	let team_users = await User.find({managerId: userId});
+	let usersIds = team_users.map(function(user) {
+	  return user._id;
+	});
+	
+	filterCondtn = {_id: {$in: usersIds}}
+	
+  } else if(user.role === 0){
+	 filterCondtn = {role: {$ne: '0'}}
+  }
+  
+  const users = await User.find(filterCondtn).sort({firstname: 1})
+  
+  return responseHandler(res, 'success', users )
 };
