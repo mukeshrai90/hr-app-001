@@ -1,5 +1,5 @@
 const Request = require("../models/Request");
-const User = require("../models/user");
+const User = require("../models/User");
 const { errorHandler } = require("../helpers/dbErrorHandler");
 const { responseHandler } = require("../helpers/responseHandler");
 const { sendMail } = require("../helpers/mailer");
