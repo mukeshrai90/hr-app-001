@@ -11,7 +11,7 @@ exports.create = async (req, res) => {
   const request = new Request({ ...req.body, userId });
   
   let user = await User.findOne({_id: userId});
-  if(Object.keys(user).length === 0){
+  if(!user || user == undefined || Object.keys(user).length === 0){
 	return responseHandler(res, 'error', [], 'Invalid user')
   }
 
@@ -47,15 +47,15 @@ exports.create = async (req, res) => {
 	let hr_admin = await User.findOne({role: 0}).sort({_id:1});
 	
 	let manager = {};
-	if(user.managerId != ''){
+	if(user?.managerId != undefined && user.managerId != ''){
 		manager  = await User.findOne({_id: user.managerId});
 	}
 	
 	let toEmails = [];
-	if(Object.keys(hr_admin).length > 0 && hr_admin._id != undefined){
+	if(hr_admin && hr_admin != undefined && Object.keys(hr_admin).length > 0 && hr_admin._id != undefined){
 		toEmails.push(hr_admin.email);
 	}
-	if(Object.keys(manager).length > 0 && manager._id != undefined){
+	if(manager && manager != undefined && Object.keys(manager).length > 0 && manager._id != undefined){
 		toEmails.push(manager.email);
 	}
 	
