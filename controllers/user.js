@@ -1,4 +1,4 @@
-const User = require("../models/user");
+const User = require("../models/User");
 const ForgotPassword = require("../models/ForgotPassword");
 const { errorHandler } = require("../helpers/dbErrorHandler");
 const { responseHandler } = require("../helpers/responseHandler");
