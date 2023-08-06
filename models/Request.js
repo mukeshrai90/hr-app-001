@@ -27,8 +27,13 @@ const RequestSchema = new mongoose.Schema({
     },
 	comment: {
 		type : String,
-	}
-  
+	},
+	action_By : { 
+		type : ObjectId, ref: 'User' 
+	},
+	action_At : {
+        type : Date,                
+    },
 
 }, {timestamps : true})
 

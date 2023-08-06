@@ -1,4 +1,4 @@
-const User = require("../models/User");
+const User = require("../models/user");
 const ForgotPassword = require("../models/ForgotPassword");
 const { errorHandler } = require("../helpers/dbErrorHandler");
 const { responseHandler } = require("../helpers/responseHandler");
@@ -139,9 +139,17 @@ exports.getAllManagerUsers = async (req, res) => {
   return responseHandler(res, 'success', users )
 };
 
+exports.getAllEmployeeUsers = async (req, res) => {
+
+  const users = await User .find( {role:1})
+  return responseHandler(res, 'success', users )
+};
+
 exports.updateUser = async (req, res) => {
 
   var userId = req.params.userId;
+  var selectedEmployees = req.body?.selectedEmployees;
+  let user = await User.find({ _id: userId})
 
   var conditions = {
 	_id : userId 
@@ -154,10 +162,18 @@ exports.updateUser = async (req, res) => {
 	  // email : req.body.email;
   }
 
-  User.findOneAndUpdate(conditions, update, function(error,result){
+  User.findOneAndUpdate(conditions, update, async function(error,result){
     if(error){
       return responseHandler(res, 'error', [], error, 403)
     } else{
+	  
+	  if(result.role == 2){
+		  if(selectedEmployees != undefined && selectedEmployees.length > 0){
+			  const updated_1 = await User.updateMany({managerId: result._id, role: 1}, { managerId: null });
+			  const updated_2 = await User.updateMany({_id: {$in: selectedEmployees}}, { managerId: result._id });
+		  }
+	  }
+		
 	  return responseHandler(res, 'success', result )
     }
   });
@@ -282,4 +298,17 @@ exports.getAllUsersByRole = async (req, res) => {
   const users = await User.find(filterCondtn).sort({firstname: 1})
   
   return responseHandler(res, 'success', users )
+};
+
+exports.getAllTeamUsers = async (req, res) => {
+  
+   const userId = req.params.userId;
+   let filterCondtn = {};
+  
+   let team_users = await User.find({managerId: userId});
+   let usersIds = team_users.map(function(user) {
+	  return user._id;
+   });
+	
+   return responseHandler(res, 'success', usersIds )
 };

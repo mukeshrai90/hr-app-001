@@ -1,5 +1,5 @@
 const Request = require("../models/Request");
-const User = require("../models/User");
+const User = require("../models/user");
 const { errorHandler } = require("../helpers/dbErrorHandler");
 const { responseHandler } = require("../helpers/responseHandler");
 const { sendMail } = require("../helpers/mailer");
@@ -137,7 +137,7 @@ exports.getAllRequestByUserId = async (req, res) => {
     }
 	
 	let totalCount = await Request.countDocuments(filterCondtn).exec();
-	let requests = await Request.find(filterCondtn).sort({start_date: 1}).limit(perPage).skip(perPage * page).populate("userId")
+    let requests = await Request.find(filterCondtn).sort({start_date: 1}).limit(perPage).skip(perPage * page).populate({path:"userId", model: 'User', populate: {path: 'managerId', model: 'User'}}).populate({path: 'action_By', model: 'User'});
     
 	let responseData = {perPage: perPage, totalCount: 0, requests: {}};
 	responseData.totalCount = totalCount;
@@ -167,15 +167,18 @@ exports.deleteRequest =  (req, res) => {
 
 exports.updateRequestState =  async (req, res) => {
 	
-  let request = await Request.findOne({_id: req.params.id}).populate("userId")
+  let loggedUserId = req.auth._id;
+  
+  let request = await Request.findOne({_id: req.params.id}).populate("userId", "_id firstname lastname")
   if(Object.keys(request).length === 0){
 	return responseHandler(res, 'error', [], 'Invalid request')
   }
   
   let state = req.params.state;
   let comment = req?.body?.comment;
+  let cunntTime = new Date().toISOString();
   
-  Request.findByIdAndUpdate(req.params.id , {state : state, comment: comment}, function (err, docs) {
+  Request.findByIdAndUpdate(req.params.id, {state:state, comment:comment, action_By:loggedUserId, action_At:cunntTime}, function (err, docs) {
     if (err){
       console.log("🚀 ~ file: controllers/request.js:116 ~ updateRequestState ~ _data:", err)
       res.status(500).json(err);
