@@ -135,7 +135,7 @@ exports.isAdmin = (req, res, next) => {
 
 exports.getAllManagerUsers = async (req, res) => {
 
-  const users = await User .find( {role:2})
+  const users = await User .find( {role: {$ne: 1}} )
   return responseHandler(res, 'success', users )
 };
 
